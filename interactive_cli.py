@@ -1,7 +1,7 @@
 import json
 
 from hybrid_path_nlp import HybridPathNLP
-
+from mdp import run_navigation
 
 def main() -> None:
     parser = HybridPathNLP()
@@ -40,6 +40,12 @@ def main() -> None:
         }
 
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["is_complete"]:
+            print("\nStarting MDP Navigation...")
+            run_navigation(result)
+        else:
+            print("\nNavigation instruction incomplete")
+            print("Missing:", result["missing_slots"])
         print("\nDebug:")
         print(json.dumps(debug_info, ensure_ascii=False, indent=2))
 
