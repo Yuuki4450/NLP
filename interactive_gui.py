@@ -23,7 +23,7 @@ class PathNLPDemo:
         if status["model_loaded"]:
             status_text = f"loaded slot tagger from {status['model_path']}"
         else:
-            status_text = "slot_tagger.pkl not found, using fallback-heavy mode"
+            status_text = status.get("warning") or "slot_tagger.pkl not found, using fallback-heavy mode"
         self.status_label = tk.Label(root, text=status_text, anchor="w")
         self.status_label.pack(fill=tk.X, padx=10, pady=(8, 0))
 
@@ -57,6 +57,7 @@ class PathNLPDemo:
                 "slot_source": debug.get("slot_source"),
                 "fallback_reason": debug.get("fallback_reason"),
                 "model_slots": debug.get("model_slots"),
+                "model_avoid_points": debug.get("model_avoid_points"),
                 "model_loaded": debug.get("model_loaded"),
                 "model_path": debug.get("model_path"),
                 "warning": debug.get("warning"),

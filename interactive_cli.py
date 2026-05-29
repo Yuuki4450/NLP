@@ -12,7 +12,7 @@ def main() -> None:
     if status["model_loaded"]:
         print(f"loaded slot tagger from {status['model_path']}")
     else:
-        print("slot_tagger.pkl not found, using fallback-heavy mode")
+        print(status.get("warning") or "slot_tagger.pkl not found, using fallback-heavy mode")
 
     while True:
         try:
@@ -34,6 +34,7 @@ def main() -> None:
             "slot_source": debug.get("slot_source"),
             "fallback_reason": debug.get("fallback_reason"),
             "model_slots": debug.get("model_slots"),
+            "model_avoid_points": debug.get("model_avoid_points"),
             "model_loaded": debug.get("model_loaded"),
             "model_path": debug.get("model_path"),
             "warning": debug.get("warning"),

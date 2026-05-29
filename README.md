@@ -10,6 +10,7 @@ NLP 模块负责：
 
 - 识别用户是否在表达路径规划需求。
 - 抽取起点 `start`、途经点 `waypoints`、终点 `end`。
+- 抽取避让点 `avoid_points`，用于表达“不经过/避开/绕开”等约束。
 - 将中文颜色别名归一化为英文颜色 key。
 - 在模型抽取失败时使用规则解析器兜底。
 
@@ -34,12 +35,13 @@ NLP 模块不负责：
   "start": "blue",
   "waypoints": ["purple"],
   "end": "blue",
+  "avoid_points": ["yellow"],
   "is_complete": true,
   "missing_slots": []
 }
 ```
 
-说明：黄色出现在“不经过黄色”中，因此不会加入 `waypoints`。当前最终接口不输出 `avoid_points`。
+说明：黄色出现在“不经过黄色”中，因此不会加入 `waypoints`，而会进入 `avoid_points`。
 
 ## 2. 支持的颜色点
 
@@ -72,7 +74,7 @@ NLP 模块不负责：
 | 组件 | 说明 |
 |---|---|
 | `IntentClassifier` | 使用 `TfidfVectorizer + LogisticRegression` 判断 `navigation` / `unknown` 等意图。 |
-| `BiLSTMCRFSlotTagger` | 使用 PyTorch 字符级 BiLSTM-CRF 做 BIO 序列标注，抽取 `START` / `END` / `WAYPOINT`。 |
+| `BiLSTMCRFSlotTagger` | 使用 PyTorch 字符级 BiLSTM-CRF 做 BIO 序列标注，抽取 `START` / `END` / `WAYPOINT` / `AVOID`。 |
 | `ColorNormalizer` | 将“蓝色点 / 蓝点 / 蓝”等中文别名归一化为 `blue` 等标准 key。 |
 | `PathNLPParser` | 规则解析器，作为 fallback，提高系统鲁棒性。 |
 | `HybridPathNLP` | 对外统一入口，模型优先，失败时规则兜底。 |
@@ -97,8 +99,9 @@ NLP 模块不负责：
 - `B-START` / `I-START`
 - `B-END` / `I-END`
 - `B-WAYPOINT` / `I-WAYPOINT`
+- `B-AVOID` / `I-AVOID`
 
-当前最终接口不输出 `avoid_points`，因此“不经过/避开”后的颜色在 BIO 中标为 `O`，不作为 waypoint。
+“不经过/避开/绕开”后的颜色在 BIO 中标为 `AVOID`，最终输出到 `avoid_points`，不作为 waypoint。
 
 ## 5. 安装环境
 
@@ -161,14 +164,15 @@ python evaluate_hybrid_nlp.py
 最近一次评估结果：
 
 ```text
-Total samples: 109
+Total samples: 112
 Intent accuracy: 1.0000
 Start accuracy: 1.0000
 End accuracy: 1.0000
 Waypoint exact match accuracy: 1.0000
+Avoid exact match accuracy: 1.0000
 Semantic frame accuracy: 1.0000
-Fallback used: 29 / 109
-Fallback rate: 0.2661
+Fallback used: 38 / 112
+Fallback rate: 0.3393
 No prediction errors.
 ```
 
@@ -178,7 +182,8 @@ No prediction errors.
 - `Start accuracy`：起点识别准确率。
 - `End accuracy`：终点识别准确率。
 - `Waypoint exact match accuracy`：途经点列表完全匹配率，包括顺序。
-- `Semantic frame accuracy`：`start`、`waypoints`、`end` 全部正确才算正确。
+- `Avoid exact match accuracy`：避让点列表完全匹配率，包括顺序。
+- `Semantic frame accuracy`：`start`、`waypoints`、`end`、`avoid_points` 全部正确才算正确。
 - `Fallback rate`：使用规则兜底的比例。
 
 ## 9. 人工测试方式
@@ -213,10 +218,13 @@ GUI 会显示：
 5. 从蓝到红，途径黄和紫
 6. 我要从蓝色点出发，经过紫，到蓝色，不要经过黄色
 7. 从红点到蓝点，途径橙点，避开黄色点
-8. 从青色点到蓝色点
-9. 到绿色点
-10. 从蓝色点出发
-11. 今天天气怎么样
+8. 从蓝到红，避开黄和紫
+9. 去绿色点，避开红点
+10. 从蓝色点出发，不经过黄色点
+11. 从青色点到蓝色点
+12. 到绿色点
+13. 从蓝色点出发
+14. 今天天气怎么样
 
 ## 10. Python API 用法
 
@@ -238,6 +246,7 @@ print(result)
   "start": "blue",
   "waypoints": ["cyan"],
   "end": "green",
+  "avoid_points": [],
   "is_complete": true,
   "missing_slots": []
 }
@@ -260,6 +269,7 @@ print(debug_result)
 - `start`
 - `waypoints`
 - `end`
+- `avoid_points`
 
 例如：
 
@@ -267,9 +277,12 @@ print(debug_result)
 {
   "start": "blue",
   "waypoints": ["cyan", "purple"],
-  "end": "green"
+  "end": "green",
+  "avoid_points": ["yellow"]
 }
 ```
+
+如果后端暂时不支持 `avoid_points`，可以忽略该字段；NLP 只负责识别颜色 key，不判断地图上是否真的可避开。
 
 NLP 不负责：
 
@@ -284,10 +297,10 @@ NLP 不负责：
 当前限制：
 
 1. 当前只支持七个颜色点。
-2. 当前最终输出不包含 `avoid_points`。
-3. “不经过/避开”表达会被识别为非 waypoint，但不会输出避开点。
+2. NLP 识别 `avoid_points`，但不判断具体地图路径是否能避开。
+3. 具体避让路径由后端 CV/MDP 模块处理。
 4. 当前训练数据主要由模板自动生成，适合本课程任务，但不代表开放域泛化能力。
-5. 如果未来需要支持避让约束，可以扩展 BIO 标签 `B-AVOID` / `I-AVOID`，并在 JSON 中增加 `avoid_points`。
+5. 如果未来需要更复杂约束，可以继续扩展槽位，例如禁止边、偏好点或动态障碍。
 
 ## 13. 项目文件说明
 

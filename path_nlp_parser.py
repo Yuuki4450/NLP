@@ -76,7 +76,7 @@ class PathNLPParser:
         )
         self._avoid_re = re.compile(
             rf"(?:不经过|不要经过|别经过|不路过|不要路过|避开|绕开|不走|不要走)\s*"
-            rf"(?P<color>{alias_pattern})"
+            rf"(?P<body>.*?)(?=[，,。；;]|$)"
         )
 
     def parse(self, text):
@@ -89,7 +89,12 @@ class PathNLPParser:
 
         start = self._extract_start(text, mentions)
         end = self._extract_end(text)
-        waypoints = self._extract_waypoints(text)
+        avoid_points = self._extract_avoid_points(text)
+        waypoints = [
+            waypoint
+            for waypoint in self._extract_waypoints(text)
+            if waypoint not in set(avoid_points)
+        ]
 
         missing_slots = []
         if start is None:
@@ -102,6 +107,7 @@ class PathNLPParser:
             "start": start,
             "waypoints": waypoints,
             "end": end,
+            "avoid_points": avoid_points,
             "is_complete": not missing_slots,
             "missing_slots": missing_slots,
         }
@@ -112,6 +118,7 @@ class PathNLPParser:
             "start": start,
             "waypoints": waypoints,
             "end": end,
+            "avoid_points": [],
             "is_complete": intent == "navigation" and start is not None and end is not None,
             "missing_slots": [],
         }
@@ -173,6 +180,16 @@ class PathNLPParser:
         waypoints.extend(self._destination_sequence_waypoints(text, waypoints))
         return waypoints
 
+    def _extract_avoid_points(self, text: str) -> List[str]:
+        avoid_points = []
+        for match in self._avoid_re.finditer(text):
+            body_start = match.start("body")
+            body = match.group("body")
+            for mention in self._find_colors(body, body_start):
+                if mention.color not in avoid_points:
+                    avoid_points.append(mention.color)
+        return avoid_points
+
     def _last_end_match(self, text: str):
         matches = list(self._end_re.finditer(text))
         if not matches:
@@ -226,10 +243,12 @@ class PathNLPParser:
         return ranges
 
     def _avoid_ranges(self, text: str) -> List[tuple]:
-        return [
-            (match.start("color"), match.end("color"))
-            for match in self._avoid_re.finditer(text)
-        ]
+        ranges = []
+        for match in self._avoid_re.finditer(text):
+            body_start = match.start("body")
+            body = match.group("body")
+            ranges.extend((mention.start, mention.end) for mention in self._find_colors(body, body_start))
+        return ranges
 
     @staticmethod
     def _in_ranges(mention: _ColorMention, ranges: List[tuple]) -> bool:
