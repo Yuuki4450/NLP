@@ -12,6 +12,8 @@ BIO_TAGS = (
     "I-END",
     "B-WAYPOINT",
     "I-WAYPOINT",
+    "B-AVOID",
+    "I-AVOID",
 )
 
 
@@ -108,17 +110,60 @@ MISSING_START_WITH_WAYPOINT_TEMPLATES = (
 )
 
 
-AVOID_ONLY_TEMPLATES = (
-    "从{START}到{END}，不经过{AVOID}",
-    "从{START}到{END}，不要经过{AVOID}",
+NO_WAYPOINT_WITH_AVOID_TEMPLATES = (
     "从{START}到{END}，避开{AVOID}",
-    "从{START}到{END}，绕开{AVOID}",
+    "从{START}到{END}，不经过{AVOID}",
+    "从{START}去{END}，不要经过{AVOID}",
+    "我要从{START}到{END}，绕开{AVOID}",
+    "帮我规划从{START}到{END}的路线，避开{AVOID}",
+    "从{START}到{END}，不要经过{AVOID}",
+    "从{START}到{END}，别经过{AVOID}",
+    "从{START}到{END}，不路过{AVOID}",
+    "从{START}到{END}，不要路过{AVOID}",
+    "从{START}到{END}，不走{AVOID}",
+    "从{START}到{END}，不要走{AVOID}",
 )
 
 
-WAYPOINT_WITH_AVOID_TEMPLATES = (
+ONE_WAYPOINT_WITH_AVOID_TEMPLATES = (
+    "从{START}经过{WP}到{END}，避开{AVOID}",
     "从{START}经过{WP}到{END}，不经过{AVOID}",
     "从{START}出发，经过{WP}，最后到{END}，不要经过{AVOID}",
+    "从{START}到{END}，途径{WP}，不要经过{AVOID}",
+    "从{START}到{END}，先去{WP}，绕开{AVOID}",
+)
+
+
+TWO_WAYPOINT_WITH_AVOID_TEMPLATES = (
+    "从{START}出发，先经过{WP1}，再经过{WP2}，最后到{END}，避开{AVOID}",
+    "从{START}到{END}，途径{WP1}和{WP2}，不经过{AVOID}",
+    "从{START}经过{WP1}再经过{WP2}到{END}，绕开{AVOID}",
+)
+
+
+INVERTED_WITH_AVOID_TEMPLATES = (
+    "去{END}，从{START}出发，避开{AVOID}",
+    "终点是{END}，起点是{START}，不要经过{AVOID}",
+)
+
+
+MISSING_START_WITH_AVOID_TEMPLATES = (
+    "去{END}，避开{AVOID}",
+    "到{END}，不经过{AVOID}",
+    "帮我规划到{END}，绕开{AVOID}",
+)
+
+
+MISSING_END_WITH_AVOID_TEMPLATES = (
+    "从{START}出发，避开{AVOID}",
+    "起点是{START}，不要经过{AVOID}",
+    "我现在在{START}，绕开{AVOID}",
+)
+
+
+TWO_AVOID_TEMPLATES = (
+    "从{START}到{END}，避开{AVOID1}和{AVOID2}",
+    "从{START}到{END}，不经过{AVOID1}和{AVOID2}",
 )
 
 
@@ -215,26 +260,37 @@ def _iter_bio_samples() -> Iterable[Dict[str, object]]:
             start_text, end_text, avoid_text = _aliases_for_tuple(
                 start, end, avoid, variant=variant
             )
-            for template in AVOID_ONLY_TEMPLATES:
+            for template in NO_WAYPOINT_WITH_AVOID_TEMPLATES:
                 yield _sample(
                     template,
                     start_text=start_text,
                     end_text=end_text,
-                    avoid_text=avoid_text,
+                    avoid_texts=[avoid_text],
                 )
+            for template in INVERTED_WITH_AVOID_TEMPLATES:
+                yield _sample(
+                    template,
+                    start_text=start_text,
+                    end_text=end_text,
+                    avoid_texts=[avoid_text],
+                )
+            for template in MISSING_START_WITH_AVOID_TEMPLATES:
+                yield _sample(template, end_text=end_text, avoid_texts=[avoid_text])
+            for template in MISSING_END_WITH_AVOID_TEMPLATES:
+                yield _sample(template, start_text=start_text, avoid_texts=[avoid_text])
 
     for start, waypoint, end, avoid in permutations(colors, 4):
         for variant in range(_max_alias_count(start, waypoint, end, avoid)):
             start_text, waypoint_text, end_text, avoid_text = _aliases_for_tuple(
                 start, waypoint, end, avoid, variant=variant
             )
-            for template in WAYPOINT_WITH_AVOID_TEMPLATES:
+            for template in ONE_WAYPOINT_WITH_AVOID_TEMPLATES:
                 yield _sample(
                     template,
                     start_text=start_text,
                     waypoint_texts=[waypoint_text],
                     end_text=end_text,
-                    avoid_text=avoid_text,
+                    avoid_texts=[avoid_text],
                 )
 
     for start, waypoint_a, waypoint_b, end in permutations(colors, 4):
@@ -256,28 +312,60 @@ def _iter_bio_samples() -> Iterable[Dict[str, object]]:
                     end_text=end_text,
                 )
 
+    for start, waypoint_a, waypoint_b, end, avoid in permutations(colors, 5):
+        for variant in range(_max_alias_count(start, waypoint_a, waypoint_b, end, avoid)):
+            start_text, waypoint_a_text, waypoint_b_text, end_text, avoid_text = _aliases_for_tuple(
+                start, waypoint_a, waypoint_b, end, avoid, variant=variant
+            )
+            for template in TWO_WAYPOINT_WITH_AVOID_TEMPLATES:
+                yield _sample(
+                    template,
+                    start_text=start_text,
+                    waypoint_texts=[waypoint_a_text, waypoint_b_text],
+                    end_text=end_text,
+                    avoid_texts=[avoid_text],
+                )
+
+    for start, end, avoid_a, avoid_b in permutations(colors, 4):
+        for variant in range(_max_alias_count(start, end, avoid_a, avoid_b)):
+            start_text, end_text, avoid_a_text, avoid_b_text = _aliases_for_tuple(
+                start, end, avoid_a, avoid_b, variant=variant
+            )
+            for template in TWO_AVOID_TEMPLATES:
+                yield _sample(
+                    template,
+                    start_text=start_text,
+                    end_text=end_text,
+                    avoid_texts=[avoid_a_text, avoid_b_text],
+                )
+
 
 def _sample(
     template: str,
     start_text: Optional[str] = None,
     waypoint_texts: Optional[Sequence[str]] = None,
     end_text: Optional[str] = None,
-    avoid_text: Optional[str] = None,
+    avoid_texts: Optional[Sequence[str]] = None,
 ) -> Dict[str, object]:
     waypoint_texts = list(waypoint_texts or [])
+    avoid_texts = list(avoid_texts or [])
     text = template.format(
         START=start_text or "",
         WP=waypoint_texts[0] if waypoint_texts else "",
         WP1=waypoint_texts[0] if waypoint_texts else "",
         WP2=waypoint_texts[1] if len(waypoint_texts) > 1 else "",
         END=end_text or "",
-        AVOID=avoid_text or "",
+        AVOID=avoid_texts[0] if avoid_texts else "",
+        AVOID1=avoid_texts[0] if avoid_texts else "",
+        AVOID2=avoid_texts[1] if len(avoid_texts) > 1 else "",
     )
     labels = ["O"] * len(text)
     _tag_span(text, labels, start_text, "START")
     for waypoint_text in waypoint_texts:
         _tag_span(text, labels, waypoint_text, "WAYPOINT")
     _tag_span(text, labels, end_text, "END")
+    for avoid_text in avoid_texts:
+        _tag_span(text, labels, avoid_text, "AVOID")
     tokens = list(text)
     return {
         "text": text,

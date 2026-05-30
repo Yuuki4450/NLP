@@ -55,8 +55,8 @@ navigation_data = {
     "intent": "navigation",
     "start": "blue",
     "waypoints": ["orange"],
-    "avoid": ["purple"],
     "end": "red",
+    "avoid_points": ["purple"],
     "is_complete": True,
     "missing_slots": []
 }
@@ -76,6 +76,7 @@ cmap = mcolors.ListedColormap([
 
 bounds = np.arange(-0.5, 10.5, 1)
 norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
 
 def bfs(grid, start, goal):
     queue = deque([start])
@@ -102,6 +103,7 @@ def bfs(grid, start, goal):
 
     return False
 
+
 def all_reachable(grid):
     names = list(points.keys())
 
@@ -114,6 +116,7 @@ def all_reachable(grid):
                 return False
 
     return True
+
 
 def carve_path(grid, p1, p2):
     r1, c1 = p1
@@ -136,7 +139,7 @@ def carve_path(grid, p1, p2):
             moves.append((0, -1))
 
         if random.random() < 0.45:
-            random_moves = [(1,0),(-1,0),(0,1),(0,-1)]
+            random_moves = [(1, 0), (-1, 0), (0, 1), (0, -1)]
             random.shuffle(random_moves)
 
             for move in random_moves:
@@ -157,6 +160,7 @@ def carve_path(grid, p1, p2):
 
     grid[r2, c2] = EMPTY
 
+
 def generate_map():
     while True:
         grid = np.ones((GRID_HEIGHT, GRID_WIDTH), dtype=int)
@@ -166,7 +170,7 @@ def generate_map():
             c = random.randint(1, GRID_WIDTH - 8)
             h = random.randint(2, 9)
             w = random.randint(2, 9)
-            grid[r:r+h, c:c+w] = EMPTY
+            grid[r:r + h, c:c + w] = EMPTY
 
         names = list(points.keys())
         for i in range(len(names)):
@@ -179,7 +183,7 @@ def generate_map():
             h = random.randint(1, 4)
             w = random.randint(1, 4)
             if random.random() < 0.55:
-                grid[r:r+h, c:c+w] = OBSTACLE
+                grid[r:r + h, c:c + w] = OBSTACLE
 
         for pos in points.values():
             r, c = pos
@@ -195,6 +199,7 @@ def generate_map():
 
         if all_reachable(grid):
             return grid
+
 
 def solve_mdp(grid, goal_pos, avoid_positions=None):
     if avoid_positions is None:
@@ -255,12 +260,13 @@ def solve_mdp(grid, goal_pos, avoid_positions=None):
 
     return value_function, policy, iterations
 
+
 def extract_path(
-    grid,
-    policy,
-    start_pos,
-    goal_pos,
-    avoid_positions=None
+        grid,
+        policy,
+        start_pos,
+        goal_pos,
+        avoid_positions=None
 ):
     if avoid_positions is None:
         avoid_positions = []
@@ -300,12 +306,13 @@ def extract_path(
 
     return None
 
+
 def visualize(
-    grid,
-    value_function,
-    policy,
-    path,
-    title="MDP Navigation"
+        grid,
+        value_function,
+        policy,
+        path,
+        title="MDP Navigation"
 ):
     plt.figure(figsize=(12, 12))
     plt.imshow(grid, cmap=cmap, norm=norm, origin='lower')
@@ -349,8 +356,20 @@ def visualize(
 
     plt.figure(figsize=(12, 12))
     heatmap = np.copy(value_function)
-    heatmap[grid == OBSTACLE] = np.nan
-    plt.imshow(heatmap, cmap='plasma', origin='lower')
+
+    masked_heatmap = np.ma.masked_where(
+        grid == OBSTACLE,
+        heatmap
+    )
+
+    cmap_heat = plt.cm.plasma.copy()
+    cmap_heat.set_bad(color='black')
+
+    plt.imshow(
+        masked_heatmap,
+        cmap=cmap_heat,
+        origin='lower'
+    )
     plt.title("Value Heatmap")
     ax = plt.gca()
     ax.set_xticks(np.arange(0, GRID_WIDTH, 5))
@@ -393,13 +412,13 @@ def visualize(
                     )
     plt.show()
 
-def run_navigation(nav_data):
 
+def run_navigation(nav_data):
     start = nav_data["start"].upper()
     end = nav_data["end"].upper()
 
     waypoints = [w.upper() for w in nav_data.get("waypoints", [])]
-    avoid = [a.upper() for a in nav_data.get("avoid", [])]
+    avoid = [a.upper() for a in nav_data.get("avoid_points", [])]
 
     route = [start] + waypoints + [end]
 
@@ -464,14 +483,15 @@ def run_navigation(nav_data):
         title=f"{' -> '.join(route)}"
     )
 
-if __name__ == "__main__":
 
+# 样例测试
+if __name__ == "__main__":
     navigation_data = {
         "intent": "navigation",
         "start": "blue",
         "waypoints": ["orange"],
-        "avoid": ["purple"],
         "end": "red",
+        "avoid_points": ["purple"],
         "is_complete": True,
         "missing_slots": []
     }

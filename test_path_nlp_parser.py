@@ -8,6 +8,7 @@ class PathNLPParserTest(unittest.TestCase):
         self.parser = PathNLPParser()
 
     def assertParse(self, text, expected):
+        expected.setdefault("avoid_points", [])
         self.assertEqual(self.parser.parse(text), expected)
 
     def test_parse_direct_from_to(self):
@@ -199,38 +200,51 @@ class PathNLPParserTest(unittest.TestCase):
                 "blue",
                 [],
                 "green",
+                ["purple"],
             ),
             (
                 "我要从蓝色点出发，经过紫，到蓝色，不要经过黄色",
                 "blue",
                 ["purple"],
                 "blue",
+                ["yellow"],
             ),
             (
                 "从红点到蓝点，途径橙点，避开黄色点",
                 "red",
                 ["orange"],
                 "blue",
+                ["yellow"],
             ),
             (
                 "从青点到紫点，先经过绿点，不要路过橙点",
                 "cyan",
                 ["green"],
                 "purple",
+                ["orange"],
             ),
             (
                 "从蓝到红，绕开黄，经过紫",
                 "blue",
                 ["purple"],
                 "red",
+                ["yellow"],
+            ),
+            (
+                "从蓝到红，避开黄和紫",
+                "blue",
+                [],
+                "red",
+                ["yellow", "purple"],
             ),
         ]
 
-        for text, start, waypoints, end in cases:
+        for text, start, waypoints, end, avoid_points in cases:
             result = self.parser.parse(text)
             self.assertEqual(result["start"], start)
             self.assertEqual(result["waypoints"], waypoints)
             self.assertEqual(result["end"], end)
+            self.assertEqual(result["avoid_points"], avoid_points)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ def nav(
     start: Optional[str],
     waypoints: List[str],
     end: Optional[str],
+    avoid_points: Optional[List[str]] = None,
 ) -> Dict[str, object]:
     missing_slots = []
     if start is None:
@@ -26,6 +27,7 @@ def nav(
         "start": start,
         "waypoints": waypoints,
         "end": end,
+        "avoid_points": list(avoid_points or []),
         "is_complete": not missing_slots,
         "missing_slots": missing_slots,
     }
@@ -38,6 +40,7 @@ def unknown(text: str) -> Dict[str, object]:
         "start": None,
         "waypoints": [],
         "end": None,
+        "avoid_points": [],
         "is_complete": False,
         "missing_slots": [],
     }
@@ -159,18 +162,21 @@ EVALUATION_SAMPLES: List[Dict[str, object]] = [
     unknown("今天吃什么"),
     unknown("打开音乐"),
     unknown("讲个笑话"),
-    # Confusing color cases and unsupported avoid constraint.
+    # Confusing color cases and avoid constraints.
     nav("从青色点到蓝色点", "cyan", [], "blue"),
     nav("从蓝色点到青色点", "blue", [], "cyan"),
     nav("从赤色点到红色点", "red", [], "red"),
     nav("从红色点到赤色点", "red", [], "red"),
     nav("从绿色点到青色点，经过蓝色点", "green", ["blue"], "cyan"),
-    nav("从蓝色点到绿色点，不经过紫色点", "blue", [], "green"),
-    nav("我要从蓝色点出发，经过紫，到蓝色，不要经过黄色", "blue", ["purple"], "blue"),
-    nav("从红点到蓝点，途径橙点，避开黄色点", "red", ["orange"], "blue"),
-    nav("从青点到紫点，先经过绿点，不要路过橙点", "cyan", ["green"], "purple"),
-    nav("从蓝到红，绕开黄，经过紫", "blue", ["purple"], "red"),
-    nav("从橙到青，不走红，经过绿", "orange", ["green"], "cyan"),
+    nav("从蓝色点到绿色点，不经过紫色点", "blue", [], "green", ["purple"]),
+    nav("我要从蓝色点出发，经过紫，到蓝色，不要经过黄色", "blue", ["purple"], "blue", ["yellow"]),
+    nav("从红点到蓝点，途径橙点，避开黄色点", "red", ["orange"], "blue", ["yellow"]),
+    nav("从青点到紫点，先经过绿点，不要路过橙点", "cyan", ["green"], "purple", ["orange"]),
+    nav("从蓝到红，绕开黄，经过紫", "blue", ["purple"], "red", ["yellow"]),
+    nav("从橙到青，不走红，经过绿", "orange", ["green"], "cyan", ["red"]),
+    nav("从蓝到红，避开黄和紫", "blue", [], "red", ["yellow", "purple"]),
+    nav("去绿色点，避开红点", None, [], "green", ["red"]),
+    nav("从蓝色点出发，不经过黄色点", "blue", [], None, ["yellow"]),
     nav("从青点到蓝点，经过红点", "cyan", ["red"], "blue"),
     nav("从蓝点到青点，经过赤点", "blue", ["red"], "cyan"),
     # Abnormal input.
@@ -183,7 +189,15 @@ EVALUATION_SAMPLES: List[Dict[str, object]] = [
 ]
 
 
-EXPECTED_PARSE_KEYS = {"intent", "start", "waypoints", "end", "is_complete", "missing_slots"}
+EXPECTED_PARSE_KEYS = {
+    "intent",
+    "start",
+    "waypoints",
+    "end",
+    "avoid_points",
+    "is_complete",
+    "missing_slots",
+}
 
 
 def evaluate(parser: HybridPathNLP, samples: List[Dict[str, object]]) -> Dict[str, object]:
@@ -192,6 +206,7 @@ def evaluate(parser: HybridPathNLP, samples: List[Dict[str, object]]) -> Dict[st
         "start": 0,
         "end": 0,
         "waypoints": 0,
+        "avoid_points": 0,
         "is_complete": 0,
         "missing_slots": 0,
         "semantic_frame": 0,
@@ -225,6 +240,7 @@ def evaluate(parser: HybridPathNLP, samples: List[Dict[str, object]]) -> Dict[st
             ("start", "start"),
             ("end", "end"),
             ("waypoints", "waypoints"),
+            ("avoid_points", "avoid_points"),
             ("is_complete", "is_complete"),
             ("missing_slots", "missing_slots"),
         ]:
@@ -237,6 +253,7 @@ def evaluate(parser: HybridPathNLP, samples: List[Dict[str, object]]) -> Dict[st
             predicted["start"] == sample["start"]
             and predicted["waypoints"] == sample["waypoints"]
             and predicted["end"] == sample["end"]
+            and predicted["avoid_points"] == sample["avoid_points"]
         ):
             counters["semantic_frame"] += 1
 
@@ -258,6 +275,7 @@ def evaluate(parser: HybridPathNLP, samples: List[Dict[str, object]]) -> Dict[st
         "start_accuracy": counters["start"] / total,
         "end_accuracy": counters["end"] / total,
         "waypoint_exact_match_accuracy": counters["waypoints"] / total,
+        "avoid_exact_match_accuracy": counters["avoid_points"] / total,
         "is_complete_accuracy": counters["is_complete"] / total,
         "missing_slots_accuracy": counters["missing_slots"] / total,
         "semantic_frame_accuracy": counters["semantic_frame"] / total,
@@ -277,6 +295,7 @@ def print_report(metrics: Dict[str, object], verbose: bool = False) -> None:
     print(f"Start accuracy: {metrics['start_accuracy']:.4f}")
     print(f"End accuracy: {metrics['end_accuracy']:.4f}")
     print(f"Waypoint exact match accuracy: {metrics['waypoint_exact_match_accuracy']:.4f}")
+    print(f"Avoid exact match accuracy: {metrics['avoid_exact_match_accuracy']:.4f}")
     print(f"Is complete accuracy: {metrics['is_complete_accuracy']:.4f}")
     print(f"Missing slots accuracy: {metrics['missing_slots_accuracy']:.4f}")
     print(f"Semantic frame accuracy: {metrics['semantic_frame_accuracy']:.4f}")
@@ -333,6 +352,7 @@ def _expected_result(sample: Dict[str, object]) -> Dict[str, object]:
         "start": sample["start"],
         "waypoints": sample["waypoints"],
         "end": sample["end"],
+        "avoid_points": sample["avoid_points"],
         "is_complete": sample["is_complete"],
         "missing_slots": sample["missing_slots"],
     }
@@ -340,7 +360,7 @@ def _expected_result(sample: Dict[str, object]) -> Dict[str, object]:
 
 def build_parser(args) -> HybridPathNLP:
     if args.model_path and os.path.exists(args.model_path):
-        return HybridPathNLP(slot_tagger=BiLSTMCRFSlotTagger(model_path=args.model_path))
+        return HybridPathNLP(model_path=args.model_path)
 
     if args.no_eval_slot_training:
         return HybridPathNLP()

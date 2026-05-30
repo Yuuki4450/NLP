@@ -113,6 +113,8 @@ class BiLSTMCRFSlotTagger:
         "I-END",
         "B-WAYPOINT",
         "I-WAYPOINT",
+        "B-AVOID",
+        "I-AVOID",
     )
 
     def __init__(
@@ -182,11 +184,11 @@ class BiLSTMCRFSlotTagger:
 
     def predict(self, text: str) -> Dict[str, object]:
         if text in self._memorized_slots:
-            return self._memorized_slots[text]
+            return self._with_default_slots(self._memorized_slots[text])
         if self.trained_epochs <= 0:
-            return {"start_text": None, "waypoint_texts": [], "end_text": None}
+            return self._empty_slots()
         if not self.model:
-            return {"start_text": None, "waypoint_texts": [], "end_text": None}
+            return self._empty_slots()
 
         token_ids = torch.tensor([[self.char_to_id.get(char, 1) for char in text]], dtype=torch.long)
         mask = torch.ones_like(token_ids, dtype=torch.float)
@@ -195,7 +197,7 @@ class BiLSTMCRFSlotTagger:
         return self.decode_slots(text, tags)
 
     def decode_slots(self, text: str, tags: Sequence[str]) -> Dict[str, object]:
-        spans = {"START": [], "WAYPOINT": [], "END": []}
+        spans = {"START": [], "WAYPOINT": [], "END": [], "AVOID": []}
         current_slot = None
         current_chars: List[str] = []
 
@@ -219,6 +221,7 @@ class BiLSTMCRFSlotTagger:
             "start_text": spans["START"][0] if spans["START"] else None,
             "waypoint_texts": spans["WAYPOINT"],
             "end_text": spans["END"][0] if spans["END"] else None,
+            "avoid_texts": spans["AVOID"],
         }
 
     def save(self, path: str) -> None:
@@ -321,3 +324,22 @@ class BiLSTMCRFSlotTagger:
     @staticmethod
     def _sample_tags(sample: Dict[str, object]) -> Sequence[str]:
         return sample.get("labels") or sample["tags"]
+
+    @staticmethod
+    def _empty_slots() -> Dict[str, object]:
+        return {
+            "start_text": None,
+            "waypoint_texts": [],
+            "end_text": None,
+            "avoid_texts": [],
+        }
+
+    @classmethod
+    def _with_default_slots(cls, slots: Dict[str, object]) -> Dict[str, object]:
+        complete = cls._empty_slots()
+        complete.update(slots)
+        if complete["waypoint_texts"] is None:
+            complete["waypoint_texts"] = []
+        if complete["avoid_texts"] is None:
+            complete["avoid_texts"] = []
+        return complete

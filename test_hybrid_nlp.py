@@ -33,6 +33,7 @@ class HybridNLPTest(unittest.TestCase):
         "start",
         "waypoints",
         "end",
+        "avoid_points",
         "is_complete",
         "missing_slots",
     }
@@ -86,6 +87,7 @@ class HybridNLPTest(unittest.TestCase):
                 "start_text": "蓝色点",
                 "waypoint_texts": ["青色点"],
                 "end_text": "绿色点",
+                "avoid_texts": [],
             },
         )
 
@@ -97,6 +99,7 @@ class HybridNLPTest(unittest.TestCase):
                     "start_text": "蓝色点",
                     "waypoint_texts": ["青色点", "紫点"],
                     "end_text": "绿色点",
+                    "avoid_texts": [],
                 }
             ),
         )
@@ -108,6 +111,7 @@ class HybridNLPTest(unittest.TestCase):
                 "start": "blue",
                 "waypoints": ["cyan", "purple"],
                 "end": "green",
+                "avoid_points": [],
                 "is_complete": True,
                 "missing_slots": [],
             },
@@ -117,7 +121,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": "绿色点"}
+                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": "绿色点", "avoid_texts": []}
             ),
         )
 
@@ -131,7 +135,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": "绿色点"}
+                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": "绿色点", "avoid_texts": []}
             ),
         )
 
@@ -156,7 +160,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": None, "waypoint_texts": [], "end_text": None}
+                {"start_text": None, "waypoint_texts": [], "end_text": None, "avoid_texts": []}
             ),
         )
 
@@ -167,6 +171,7 @@ class HybridNLPTest(unittest.TestCase):
                 "start": "blue",
                 "waypoints": [],
                 "end": "green",
+                "avoid_points": [],
                 "is_complete": True,
                 "missing_slots": [],
             },
@@ -181,7 +186,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": "火星点"}
+                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": "火星点", "avoid_texts": []}
             ),
         )
 
@@ -204,6 +209,7 @@ class HybridNLPTest(unittest.TestCase):
                 "start": None,
                 "waypoints": [],
                 "end": None,
+                "avoid_points": [],
                 "is_complete": False,
                 "missing_slots": [],
             },
@@ -217,6 +223,7 @@ class HybridNLPTest(unittest.TestCase):
                     "start_text": "蓝",
                     "waypoint_texts": ["青色点", "紫色点"],
                     "end_text": "绿",
+                    "avoid_texts": [],
                 }
             ),
         )
@@ -229,7 +236,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": "红色点", "waypoint_texts": [], "end_text": "赤色点"}
+                {"start_text": "红色点", "waypoint_texts": [], "end_text": "赤色点", "avoid_texts": []}
             ),
         )
 
@@ -242,7 +249,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": None, "waypoint_texts": [], "end_text": "绿色点"}
+                {"start_text": None, "waypoint_texts": [], "end_text": "绿色点", "avoid_texts": []}
             ),
         )
 
@@ -254,7 +261,7 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP(
             intent_classifier=FakeIntentClassifier("navigation"),
             slot_tagger=FakeSlotTagger(
-                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": None}
+                {"start_text": "蓝色点", "waypoint_texts": [], "end_text": None, "avoid_texts": []}
             ),
         )
 
@@ -308,9 +315,10 @@ class HybridNLPTest(unittest.TestCase):
 
             self.assertEqual(
                 set(result.keys()),
-                {"start_text", "waypoint_texts", "end_text"},
+                {"start_text", "waypoint_texts", "end_text", "avoid_texts"},
             )
             self.assertIsInstance(result["waypoint_texts"], list)
+            self.assertIsInstance(result["avoid_texts"], list)
             self.assertIn("蓝", loaded.char_to_id)
             self.assertEqual(loaded.id_to_char[loaded.char_to_id["蓝"]], "蓝")
             self.assertEqual(loaded.tag_to_id["B-START"], 1)
@@ -379,22 +387,24 @@ class HybridNLPTest(unittest.TestCase):
         parser = HybridPathNLP()
 
         cases = [
-            ("从蓝色点出发，先经过青色点，再经过紫色点，最后到绿色点", "blue", ["cyan", "purple"], "green"),
-            ("去绿色点，从蓝色点出发", "blue", [], "green"),
-            ("帮我规划到绿色点", None, [], "green"),
-            ("从蓝色点出发", "blue", [], None),
-            ("从青色点到蓝色点", "cyan", [], "blue"),
-            ("从蓝色点到青色点", "blue", [], "cyan"),
-            ("从蓝色点到绿色点，不经过紫色点", "blue", [], "green"),
-            ("我要从蓝色点出发，经过紫，到蓝色，不要经过黄色", "blue", ["purple"], "blue"),
+            ("从蓝色点出发，先经过青色点，再经过紫色点，最后到绿色点", "blue", ["cyan", "purple"], "green", []),
+            ("去绿色点，从蓝色点出发", "blue", [], "green", []),
+            ("帮我规划到绿色点", None, [], "green", []),
+            ("从蓝色点出发", "blue", [], None, []),
+            ("从青色点到蓝色点", "cyan", [], "blue", []),
+            ("从蓝色点到青色点", "blue", [], "cyan", []),
+            ("从蓝色点到绿色点，不经过紫色点", "blue", [], "green", ["purple"]),
+            ("我要从蓝色点出发，经过紫，到蓝色，不要经过黄色", "blue", ["purple"], "blue", ["yellow"]),
+            ("从蓝到红，避开黄和紫", "blue", [], "red", ["yellow", "purple"]),
         ]
 
-        for text, start, waypoints, end in cases:
+        for text, start, waypoints, end, avoid_points in cases:
             result = parser.parse(text)
             self.assertEqual(set(result.keys()), self.EXPECTED_PARSE_KEYS)
             self.assertEqual(result["start"], start)
             self.assertEqual(result["waypoints"], waypoints)
             self.assertEqual(result["end"], end)
+            self.assertEqual(result["avoid_points"], avoid_points)
 
     def test_default_hybrid_parser_unknown_input(self):
         result = HybridPathNLP().parse("今天天气怎么样")
@@ -406,7 +416,7 @@ class HybridNLPTest(unittest.TestCase):
         self.assertIsNotNone(importlib.import_module("interactive_cli"))
         self.assertIsNotNone(importlib.import_module("interactive_gui"))
 
-    def test_negative_training_sample_labels_avoid_color_as_o(self):
+    def test_negative_training_sample_labels_avoid_color_as_avoid(self):
         samples = generate_bio_training_data()
         sample = next(
             sample
@@ -415,7 +425,50 @@ class HybridNLPTest(unittest.TestCase):
         )
         avoid_index = sample["text"].index("紫")
 
-        self.assertEqual(sample["labels"][avoid_index], "O")
+        self.assertEqual(sample["labels"][avoid_index], "B-AVOID")
+
+    def test_hybrid_parser_outputs_avoid_points_from_model(self):
+        parser = HybridPathNLP(
+            intent_classifier=FakeIntentClassifier("navigation"),
+            slot_tagger=FakeSlotTagger(
+                {
+                    "start_text": "蓝色点",
+                    "waypoint_texts": ["紫"],
+                    "end_text": "蓝色",
+                    "avoid_texts": ["黄色"],
+                }
+            ),
+        )
+
+        debug = parser.parse_with_debug("我要从蓝色点出发，经过紫，到蓝色，不要经过黄色")
+        result = debug["result"]
+
+        self.assertEqual(debug["slot_source"], "model")
+        self.assertEqual(result["start"], "blue")
+        self.assertEqual(result["waypoints"], ["purple"])
+        self.assertEqual(result["end"], "blue")
+        self.assertEqual(result["avoid_points"], ["yellow"])
+        self.assertEqual(debug["model_avoid_points"], ["yellow"])
+
+    def test_hybrid_parser_falls_back_to_fill_missing_avoid(self):
+        parser = HybridPathNLP(
+            intent_classifier=FakeIntentClassifier("navigation"),
+            slot_tagger=FakeSlotTagger(
+                {
+                    "start_text": "蓝色点",
+                    "waypoint_texts": [],
+                    "end_text": "绿色点",
+                    "avoid_texts": [],
+                }
+            ),
+        )
+
+        debug = parser.parse_with_debug("从蓝色点到绿色点，不经过紫色点")
+
+        self.assertTrue(debug["used_fallback"])
+        self.assertEqual(debug["fallback_reason"], "missing_avoid_from_avoid_expression")
+        self.assertEqual(debug["result"]["waypoints"], [])
+        self.assertEqual(debug["result"]["avoid_points"], ["purple"])
 
 
 if __name__ == "__main__":
